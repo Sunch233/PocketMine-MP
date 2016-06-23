@@ -2382,7 +2382,7 @@ class Level implements ChunkManager, Metadatable{
 			unset($this->players[$entity->getId()]);
 			$this->checkSleep();
 		}else{
-			$entity->kill();
+			$entity->close();
 		}
 
 		unset($this->entities[$entity->getId()]);

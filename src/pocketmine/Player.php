@@ -1629,7 +1629,7 @@ class Player extends Human implements CommandSender, InventoryHolder, ChunkLoade
 			$nbt->playerGameType = new IntTag("playerGameType", $this->gamemode);
 		}
 
-		$this->allowFlight = $this->isCreative();
+		$this->allowFlight = (bool) ($this->gamemode & 0x01);
 
 		if(($level = $this->server->getLevelByName($nbt["Level"])) === null){
 			$this->setLevel($this->server->getDefaultLevel());

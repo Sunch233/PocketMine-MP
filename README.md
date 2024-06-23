@@ -1,3 +1,4 @@
+# THIS IS NOT A GENISYS FORK | DONT COMPARE IT TO GENISYS
 # ![PocketMine-MP](http://cdn.pocketmine.net/img/PocketMine-MP-h.png)
 [![Build Status](https://travis-ci.org/PocketMine/PocketMine-MP.svg?branch=master)](https://travis-ci.org/PocketMine/PocketMine-MP)
 

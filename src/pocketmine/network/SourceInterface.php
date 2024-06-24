@@ -19,6 +19,8 @@
  *
 */
 
+declare(strict_types=1);
+
 /**
  * Network-related classes
  */
@@ -28,43 +30,54 @@ use pocketmine\network\protocol\DataPacket;
 use pocketmine\Player;
 
 /**
- * Classes that implement this interface will be able to be attached to players
+ * Network interfaces are transport layers which can be used to transmit packets between the server and clients.
  */
 interface SourceInterface{
 
 	/**
+	 * Performs actions needed to start the interface after it is registered.
+	 *
+	 * @return void
+	 */
+	public function start();
+
+	/**
 	 * Sends a DataPacket to the interface, returns an unique identifier for the packet if $needACK is true
 	 *
-	 * @param Player     $player
-	 * @param DataPacket $packet
-	 * @param bool       $needACK
-	 * @param bool       $immediate
-	 *
-	 * @return int
+	 * @return int|null
 	 */
-	public function putPacket(Player $player, DataPacket $packet, $needACK = false, $immediate = true);
+	public function putPacket(Player $player, DataPacket $packet, bool $needACK = false, bool $immediate = true);
 
 	/**
 	 * Terminates the connection
 	 *
-	 * @param Player $player
-	 * @param string $reason
+	 * @return void
+	 */
+	public function close(Player $player, string $reason = "unknown reason");
+
+	/**
+	 * @return void
+	 */
+	public function setName(string $name);
+
+	/**
+	 * Called every tick to process events on the interface.
+	 */
+	public function process() : void;
+
+	/**
+	 * Gracefully shuts down the network interface.
 	 *
+	 * @return void
 	 */
-	public function close(Player $player, $reason = "unknown reason");
-
-	/**
-	 * @param string $name
-	 */
-	public function setName($name);
-
-	/**
-	 * @return bool
-	 */
-	public function process();
-
 	public function shutdown();
 
+	/**
+	 * @deprecated
+	 * Shuts down the network interface in an emergency situation, such as due to a crash.
+	 *
+	 * @return void
+	 */
 	public function emergencyShutdown();
 
 }

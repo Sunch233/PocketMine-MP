@@ -17,7 +17,21 @@ declare(strict_types=1);
 
 namespace raklib\protocol;
 
-class ACK extends AcknowledgePacket{
+#include <rules/RakLibPacket.h>
+
+class UnconnectedPing extends OfflineMessage{
+	public static $ID = MessageIdentifiers::ID_UNCONNECTED_PING;
+
 	/** @var int */
-	public static $ID = 0xc0;
+	public $pingID;
+
+	protected function encodePayload() : void{
+		$this->putLong($this->pingID);
+		$this->writeMagic();
+	}
+
+	protected function decodePayload() : void{
+		$this->pingID = $this->getLong();
+		$this->readMagic();
+	}
 }

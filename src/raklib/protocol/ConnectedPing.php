@@ -17,7 +17,19 @@ declare(strict_types=1);
 
 namespace raklib\protocol;
 
-class ACK extends AcknowledgePacket{
+#include <rules/RakLibPacket.h>
+
+class ConnectedPing extends Packet{
+	public static $ID = MessageIdentifiers::ID_CONNECTED_PING;
+
 	/** @var int */
-	public static $ID = 0xc0;
+	public $sendPingTime;
+
+	protected function encodePayload() : void{
+		$this->putLong($this->sendPingTime);
+	}
+
+	protected function decodePayload() : void{
+		$this->sendPingTime = $this->getLong();
+	}
 }

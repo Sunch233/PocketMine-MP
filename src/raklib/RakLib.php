@@ -13,148 +13,144 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace raklib;
 
-
-//Dependencies check
-$errors = 0;
-if(version_compare("7.0", PHP_VERSION) > 0){
-    echo "[CRITICAL] Use PHP >= 7.0" . PHP_EOL;
-    ++$errors;
-}
-
-if(!extension_loaded("sockets")){
-    echo "[CRITICAL] Unable to find the Socket extension." . PHP_EOL;
-    ++$errors;
-}
-
-if(!extension_loaded("pthreads")){
-    echo "[CRITICAL] Unable to find the pthreads extension." . PHP_EOL;
-    ++$errors;
-}else{
-    $pthreads_version = phpversion("pthreads");
-    if(substr_count($pthreads_version, ".") < 2){
-        $pthreads_version = "0.$pthreads_version";
-    }
-
-    if(version_compare($pthreads_version, "3.0.0") < 0){
-        echo "[CRITICAL] pthreads >= 3.0.0 is required, while you have $pthreads_version.";
-        ++$errors;
-    }
-}
-
-if($errors > 0){
-    exit(1); //Exit with error
-}
-unset($errors);
-
 abstract class RakLib{
-    const VERSION = "0.8.0";
-    const PROTOCOL = 6;
-    const MAGIC = "\x00\xff\xff\x00\xfe\xfe\xfe\xfe\xfd\xfd\xfd\xfd\x12\x34\x56\x78";
+	public const VERSION = "0.12.0";
 
-    const PRIORITY_NORMAL = 0;
-    const PRIORITY_IMMEDIATE = 1;
+	public const MIN_PHP_VERSION = "7.2.0";
 
-    const FLAG_NEED_ACK = 0b00001000;
+	/**
+	 * Default vanilla Raknet protocol version that this library implements. Things using RakNet can override this
+	 * protocol version with something different.
+	 */
+	public const DEFAULT_PROTOCOL_VERSION = 6;
+	public const MAGIC = "\x00\xff\xff\x00\xfe\xfe\xfe\xfe\xfd\xfd\xfd\xfd\x12\x34\x56\x78";
 
-    /*
-     * Internal Packet:
-     * int32 (length without this field)
-     * byte (packet ID)
-     * payload
-     */
+	public const PRIORITY_NORMAL = 0;
+	public const PRIORITY_IMMEDIATE = 1;
 
-    /*
-     * ENCAPSULATED payload:
-     * byte (identifier length)
-     * byte[] (identifier)
-     * byte (flags, last 3 bits, priority)
-     * payload (binary internal EncapsulatedPacket)
-     */
-    const PACKET_ENCAPSULATED = 0x01;
+	public const FLAG_NEED_ACK = 0b00001000;
 
-    /*
-     * OPEN_SESSION payload:
-     * byte (identifier length)
-     * byte[] (identifier)
-     * byte (address length)
-     * byte[] (address)
-     * short (port)
-     * long (clientID)
-     */
-    const PACKET_OPEN_SESSION = 0x02;
+	/*
+	 * These internal "packets" DO NOT exist in the RakNet protocol. They are used by the RakLib API to communicate
+	 * messages between the RakLib thread and the implementation's thread.
+	 *
+	 * Internal Packet:
+	 * int32 (length without this field)
+	 * byte (packet ID)
+	 * payload
+	 */
 
-    /*
-     * CLOSE_SESSION payload:
-     * byte (identifier length)
-     * byte[] (identifier)
-     * string (reason)
-     */
-    const PACKET_CLOSE_SESSION = 0x03;
+	/*
+	 * ENCAPSULATED payload:
+	 * byte (identifier length)
+	 * byte[] (identifier)
+	 * byte (flags, last 3 bits, priority)
+	 * payload (binary internal EncapsulatedPacket)
+	 */
+	public const PACKET_ENCAPSULATED = 0x01;
 
-    /*
-     * INVALID_SESSION payload:
-     * byte (identifier length)
-     * byte[] (identifier)
-     */
-    const PACKET_INVALID_SESSION = 0x04;
+	/*
+	 * OPEN_SESSION payload:
+	 * byte (identifier length)
+	 * byte[] (identifier)
+	 * byte (address length)
+	 * byte[] (address)
+	 * short (port)
+	 * long (clientID)
+	 */
+	public const PACKET_OPEN_SESSION = 0x02;
 
-    /* TODO: implement this
-     * SEND_QUEUE payload:
-     * byte (identifier length)
-     * byte[] (identifier)
-     */
-    const PACKET_SEND_QUEUE = 0x05;
+	/*
+	 * CLOSE_SESSION payload:
+	 * byte (identifier length)
+	 * byte[] (identifier)
+	 * string (reason)
+	 */
+	public const PACKET_CLOSE_SESSION = 0x03;
 
-    /*
-     * ACK_NOTIFICATION payload:
-     * byte (identifier length)
-     * byte[] (identifier)
-     * int (identifierACK)
-     */
-    const PACKET_ACK_NOTIFICATION = 0x06;
+	/*
+	 * INVALID_SESSION payload:
+	 * byte (identifier length)
+	 * byte[] (identifier)
+	 */
+	public const PACKET_INVALID_SESSION = 0x04;
 
-    /*
-     * SET_OPTION payload:
-     * byte (option name length)
-     * byte[] (option name)
-     * byte[] (option value)
-     */
-    const PACKET_SET_OPTION = 0x07;
+	/* TODO: implement this
+	 * SEND_QUEUE payload:
+	 * byte (identifier length)
+	 * byte[] (identifier)
+	 */
+	public const PACKET_SEND_QUEUE = 0x05;
 
-    /*
-     * RAW payload:
-     * byte (address length)
-     * byte[] (address from/to)
-     * short (port)
-     * byte[] (payload)
-     */
-    const PACKET_RAW = 0x08;
+	/*
+	 * ACK_NOTIFICATION payload:
+	 * byte (identifier length)
+	 * byte[] (identifier)
+	 * int (identifierACK)
+	 */
+	public const PACKET_ACK_NOTIFICATION = 0x06;
 
-    /*
-     * RAW payload:
-     * byte (address length)
-     * byte[] (address)
-     * int (timeout)
-     */
-    const PACKET_BLOCK_ADDRESS = 0x09;
+	/*
+	 * SET_OPTION payload:
+	 * byte (option name length)
+	 * byte[] (option name)
+	 * byte[] (option value)
+	 */
+	public const PACKET_SET_OPTION = 0x07;
 
-    /*
-     * No payload
-     *
-     * Sends the disconnect message, removes sessions correctly, closes sockets.
-     */
-    const PACKET_SHUTDOWN = 0x7e;
+	/*
+	 * RAW payload:
+	 * byte (address length)
+	 * byte[] (address from/to)
+	 * short (port)
+	 * byte[] (payload)
+	 */
+	public const PACKET_RAW = 0x08;
 
-    /*
-     * No payload
-     *
-     * Leaves everything as-is and halts, other Threads can be in a post-crash condition.
-     */
-    const PACKET_EMERGENCY_SHUTDOWN = 0x7f;
+	/*
+	 * BLOCK_ADDRESS payload:
+	 * byte (address length)
+	 * byte[] (address)
+	 * int (timeout)
+	 */
+	public const PACKET_BLOCK_ADDRESS = 0x09;
 
-    public static function bootstrap(\ClassLoader $loader){
-        $loader->addPath(dirname(__FILE__) . DIRECTORY_SEPARATOR . "..");
-    }
+	/*
+	 * UNBLOCK_ADDRESS payload:
+	 * byte (address length)
+	 * byte[] (address)
+	 */
+	public const PACKET_UNBLOCK_ADDRESS = 0x10;
+
+	/*
+	 * REPORT_PING payload:
+	 * byte (identifier length)
+	 * byte[] (identifier)
+	 * int32 (measured latency in MS)
+	 */
+	public const PACKET_REPORT_PING = 0x11;
+
+	/*
+	 * No payload
+	 *
+	 * Sends the disconnect message, removes sessions correctly, closes sockets.
+	 */
+	public const PACKET_SHUTDOWN = 0x7e;
+
+	/*
+	 * No payload
+	 *
+	 * Leaves everything as-is and halts, other Threads can be in a post-crash condition.
+	 */
+	public const PACKET_EMERGENCY_SHUTDOWN = 0x7f;
+
+	/**
+	 * Regular RakNet uses 10 by default. MCPE uses 20. Configure this value as appropriate.
+	 * @var int
+	 */
+	public static $SYSTEM_ADDRESS_COUNT = 20;
 }

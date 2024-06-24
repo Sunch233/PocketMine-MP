@@ -13,88 +13,98 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace raklib\protocol;
 
+
+use pocketmine\utils\Binary;
+use function chr;
+use function count;
+use function sort;
+use const SORT_NUMERIC;
+
 #ifndef COMPILE
-use raklib\Binary;
 #endif
 
 #include <rules/RakLibPacket.h>
 
 abstract class AcknowledgePacket extends Packet{
-    /** @var int[] */
-    public $packets = [];
+	private const RECORD_TYPE_RANGE = 0;
+	private const RECORD_TYPE_SINGLE = 1;
 
-    public function encode(){
-        parent::encode();
-        $payload = "";
-        sort($this->packets, SORT_NUMERIC);
-        $count = count($this->packets);
-        $records = 0;
+	/** @var int[] */
+	public $packets = [];
 
-        if($count > 0){
-            $pointer = 1;
-            $start = $this->packets[0];
-            $last = $this->packets[0];
+	protected function encodePayload() : void{
+		$payload = "";
+		sort($this->packets, SORT_NUMERIC);
+		$count = count($this->packets);
+		$records = 0;
 
-            while($pointer < $count){
-                $current = $this->packets[$pointer++];
-                $diff = $current - $last;
-                if($diff === 1){
-                    $last = $current;
-                }elseif($diff > 1){ //Forget about duplicated packets (bad queues?)
-                    if($start === $last){
-                        $payload .= "\x01";
-                        $payload .= Binary::writeLTriad($start);
-                        $start = $last = $current;
-                    }else{
-                        $payload .= "\x00";
-                        $payload .= Binary::writeLTriad($start);
-                        $payload .= Binary::writeLTriad($last);
-                        $start = $last = $current;
-                    }
-                    ++$records;
-                }
-            }
+		if($count > 0){
+			$pointer = 1;
+			$start = $this->packets[0];
+			$last = $this->packets[0];
 
-            if($start === $last){
-                $payload .= "\x01";
-                $payload .= Binary::writeLTriad($start);
-            }else{
-                $payload .= "\x00";
-                $payload .= Binary::writeLTriad($start);
-                $payload .= Binary::writeLTriad($last);
-            }
-            ++$records;
-        }
+			while($pointer < $count){
+				$current = $this->packets[$pointer++];
+				$diff = $current - $last;
+				if($diff === 1){
+					$last = $current;
+				}elseif($diff > 1){ //Forget about duplicated packets (bad queues?)
+					if($start === $last){
+						$payload .= chr(self::RECORD_TYPE_SINGLE);
+						$payload .= Binary::writeLTriad($start);
+						$start = $last = $current;
+					}else{
+						$payload .= chr(self::RECORD_TYPE_RANGE);
+						$payload .= Binary::writeLTriad($start);
+						$payload .= Binary::writeLTriad($last);
+						$start = $last = $current;
+					}
+					++$records;
+				}
+			}
 
-        $this->putShort($records);
-        $this->buffer .= $payload;
-    }
+			if($start === $last){
+				$payload .= chr(self::RECORD_TYPE_SINGLE);
+				$payload .= Binary::writeLTriad($start);
+			}else{
+				$payload .= chr(self::RECORD_TYPE_RANGE);
+				$payload .= Binary::writeLTriad($start);
+				$payload .= Binary::writeLTriad($last);
+			}
+			++$records;
+		}
 
-    public function decode(){
-        parent::decode();
-        $count = $this->getShort();
-        $this->packets = [];
-        $cnt = 0;
-        for($i = 0; $i < $count and !$this->feof() and $cnt < 4096; ++$i){
-            if($this->getByte() === 0){
-                $start = $this->getLTriad();
-                $end = $this->getLTriad();
-                if(($end - $start) > 512){
-                    $end = $start + 512;
-                }
-                for($c = $start; $c <= $end; ++$c){
-                    $this->packets[$cnt++] = $c;
-                }
-            }else{
-                $this->packets[$cnt++] = $this->getLTriad();
-            }
-        }
-    }
+		$this->putShort($records);
+		$this->buffer .= $payload;
+	}
+
+	protected function decodePayload() : void{
+		$count = $this->getShort();
+		$this->packets = [];
+		$cnt = 0;
+		for($i = 0; $i < $count and !$this->feof() and $cnt < 4096; ++$i){
+			if($this->getByte() === self::RECORD_TYPE_RANGE){
+				$start = $this->getLTriad();
+				$end = $this->getLTriad();
+				if(($end - $start) > 512){
+					$end = $start + 512;
+				}
+				for($c = $start; $c <= $end; ++$c){
+					$this->packets[$cnt++] = $c;
+				}
+			}else{
+				$this->packets[$cnt++] = $this->getLTriad();
+			}
+		}
+	}
 
 	public function clean(){
 		$this->packets = [];
+
 		return parent::clean();
 	}
 }

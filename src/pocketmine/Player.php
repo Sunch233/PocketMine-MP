@@ -240,6 +240,16 @@ class Player extends Human implements CommandSender, InventoryHolder, ChunkLoade
 	/** @var PermissibleBase */
 	private $perm = null;
 
+	private int $ping = -1;
+
+	public function updatePing(int $pingMS){
+		$this->ping = $pingMS;
+	}
+
+	public function getPing() : int{
+		return $this->ping;
+	}
+
 	public function getLeaveMessage(){
 		return new TranslationContainer(TextFormat::YELLOW . "%multiplayer.player.left", [
 			$this->getDisplayName()

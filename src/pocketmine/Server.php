@@ -102,6 +102,7 @@ use pocketmine\plugin\ScriptPluginLoader;
 use pocketmine\scheduler\FileWriteTask;
 use pocketmine\scheduler\SendUsageTask;
 use pocketmine\scheduler\ServerScheduler;
+use pocketmine\snooze\SleeperHandler;
 use pocketmine\tile\Chest;
 use pocketmine\tile\EnchantTable;
 use pocketmine\tile\FlowerPot;
@@ -131,6 +132,9 @@ class Server{
 
 	/** @var \Threaded */
 	private static $sleeper = null;
+
+	/** @var SleeperHandler */
+	private $tickSleeper;
 
 	/** @var BanList */
 	private $banByName = null;
@@ -574,14 +578,6 @@ class Server{
 	public function getLevelMetadata(){
 		return $this->levelMetadata;
 	}
-
-	/**
-	 * @return AutoUpdater
-	 */
-	public function getUpdater(){
-		return $this->updater;
-	}
-
 	/**
 	 * @return PluginManager
 	 */
@@ -1392,6 +1388,7 @@ class Server{
 	public function __construct(\ClassLoader $autoloader, \ThreadedLogger $logger, $filePath, $dataPath, $pluginPath){
 		self::$instance = $this;
 		self::$sleeper = new \Threaded;
+		$this->tickSleeper = new SleeperHandler();
 		$this->autoloader = $autoloader;
 		$this->logger = $logger;
 
@@ -1576,8 +1573,6 @@ class Server{
 
 			$this->pluginManager->loadPlugins($this->pluginPath);
 
-			$this->updater = new AutoUpdater($this, $this->getProperty("auto-updater.host", "www.pocketmine.net"));
-
 			$this->enablePlugins(PluginLoadOrder::STARTUP);
 
 			LevelProviderManager::addProvider($this, Anvil::class);
@@ -1697,7 +1692,7 @@ class Server{
 
 		return count($recipients);
 	}
-	
+
 	/**
 	 * @param string        $popup
 	 * @param Player[]|null $recipients
@@ -1715,7 +1710,7 @@ class Server{
 				}
 			}
 		}
-		
+
 		/** @var Player[] $recipients */
 		foreach($recipients as $recipient){
 			$recipient->sendPopup($popup);
@@ -2145,18 +2140,16 @@ class Server{
 		return [];
 	}
 
+	public function getTickSleeper() : SleeperHandler{
+		return $this->tickSleeper;
+	}
+
 	private function tickProcessor(){
 		$this->nextTick = microtime(true);
 		while($this->isRunning){
 			$this->tick();
-			$next = $this->nextTick - 0.0001;
-			if($next > microtime(true)){
-				try{
-					time_sleep_until($next);
-				}catch(\Throwable $e){
-					//Sometimes $next is less than the current time. High load?
-				}
-			}
+
+			$this->tickSleeper->sleepUntil($this->nextTick);
 		}
 	}
 
